@@ -1,0 +1,36 @@
+{
+  "name": "blender-mcp-server",
+  "version": "2.0.0",
+  "description": "MCP Server for Blender 3D integration with Antigravity IDE",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "node --test",
+    "lint": "eslint src/"
+  },
+  "keywords": [
+    "mcp",
+    "blender",
+    "3d",
+    "antigravity"
+  ],
+  "author": "Antigravity User",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ws": "^8.19.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

@@ -1,0 +1,28 @@
+# Dependencies & build artifacts
+node_modules/
+dist/
+__pycache__/
+*.pyc
+
+# Logs & temporary files
+*.log
+Logs/
+src/mcp-server/handshake.txt
+src/mcp-server/proxy.js
+.DS_Store
+Thumbs.db
+
+# Large Binary Asset Packages & Archives (>50MB)
+Packages/
+*.zip
+*.7z
+*.tar.gz
+
+# Exported heavy binary model files
+FBX/
+GLB/
+Blend/
+
+# Python addon archives
+src/blender-addon/*.zip
+src/blender-addon/__pycache__/
