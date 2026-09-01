@@ -303,12 +303,55 @@ function registerTools(server: McpServer): void {
         }
     );
 
-    // Tool 23: run - Execute Python script DIRECTLY in Blender with P Production Library
+    // Tool 23: run - Execute Python script DIRECTLY in Blender with P Production & Enhancement Library
     server.tool(
         'run',
-        `IMPORTANT: Execute Python code DIRECTLY in Blender.\n\nP PRODUCTION ARCHITECTURAL & ASSET LIBRARY:\n- P.room(name, width, length, height, wall_thickness, doors, windows, include_floor, include_ceiling, material_walls, material_floor)\n- P.create_continuous_wall_mesh(paths_or_rooms, thickness, height, openings, name, material_preset)\n- P.office_floor(name, rooms, height, wall_thickness, openings, include_floor)\n- P.create_wall_opening(wall_obj, opening_type, position, size, rotation_z)\n- P.create_architectural_bevel(obj, width, segments, angle_limit)\n- P.generate_unity_colliders(wall_obj)\n- P.door(name, width, height, thickness, handle_type, closer, kickplate)\n- P.stairs(name, width, total_height, num_steps, tread_depth)\n- P.bevel(obj, width, segments, angle_limit)\n- P.create_pbr_material(name, preset, base_color, roughness, metallic, bump)\n- P.smart_uv(obj, angle_limit, margin)\n- P.setup_camera_rig(target_obj)\n- P.render_inspection(cam_name)\n- P.validate_geometry(obj)\n- P.quality_check(obj)\n\nALSO AVAILABLE: PH, bpy, bmesh, math, mathutils, random, os.\n\nEXAMPLE: run({s:"r=P.room('Office_Room', width=6, length=5); P.setup_camera_rig(r); result=P.quality_check(bpy.data.objects['Office_Room_WALLS'])"})`,
+        `IMPORTANT: Execute Python code DIRECTLY in Blender.
+
+15 ENHANCEMENT PATTERNS & UTILITIES:
+- create_custom_cube(name, size_x, size_y, size_z, subdivisions, position)
+- create_custom_sphere(name, radius, subdivisions, position)
+- create_custom_cylinder(name, radius, height, subdivisions, vertices, position)
+- create_roof(name, width, depth, height, angle, thickness, position)
+- build_simple_house(name, position)
+- add_subdivision_surface_modifier(obj_name, levels, render_levels)
+- add_bevel_modifier(obj_name, width, segments, limit_method)
+- add_mirror_modifier(obj_name, axis, use_clip)
+- add_array_modifier(obj_name, count, axis, offset)
+- apply_all_modifiers(obj_name)
+- inset_face(obj_name, depth, thickness)
+- transform_object(obj_name, scale, rotation, location)
+- create_material(name, base_color, metallic, roughness, emission)
+- assign_material_to_object(obj_name, material_name)
+- create_textured_material(name, texture_type, base_color, roughness)
+
+P PRODUCTION ARCHITECTURAL & ASSET LIBRARY:
+- P.room(name, width, length, height, wall_thickness, doors, windows, include_floor, include_ceiling, material_walls, material_floor)
+- P.create_continuous_wall_mesh(paths_or_rooms, thickness, height, openings, name, material_preset)
+- P.office_floor(name, rooms, height, wall_thickness, openings, include_floor)
+- P.create_wall_opening(wall_obj, opening_type, position, size, rotation_z)
+- P.create_architectural_bevel(obj, width, segments, angle_limit)
+- P.generate_unity_colliders(wall_obj)
+- P.door(name, width, height, thickness, handle_type, closer, kickplate)
+- P.stairs(name, width, total_height, num_steps, tread_depth)
+- P.bevel(obj, width, segments, angle_limit)
+- P.create_pbr_material(name, preset, base_color, roughness, metallic, bump)
+- P.smart_uv(obj, angle_limit, margin)
+- P.setup_camera_rig(target_obj)
+- P.render_inspection(cam_name)
+- P.validate_geometry(obj)
+- P.quality_check(obj)
+
+POLY HAVEN INTEGRATION:
+- PH.import_model(slug, location, rotation, scale, resolution)
+- PH.import_texture(slug, target_objects, resolution)
+- PH.load_hdri(slug, rotation_z, strength)
+- PH.search(query, asset_type, limit)
+
+ALSO AVAILABLE: bpy, bmesh, math, mathutils, random, os.
+EXAMPLE: run({s:"r=build_simple_house('My_House'); result=r"})`,
         {
-            s: z.string().describe('Python code to execute. Use P.func() or bpy. Set result="..." for return output.'),
+            s: z.string().describe('Python code to execute. Use P.func(), PH.func(), or enhancement functions. Set result="..." for return output.'),
         },
         async (params) => {
             log.debug('Executing: run', { len: params.s.length });

@@ -23,7 +23,17 @@ import asyncio
 import sys
 import builtins
 import traceback
+import site
 from pathlib import Path
+
+# Ensure user site-packages are available
+user_site = site.getusersitepackages()
+if user_site and user_site not in sys.path:
+    sys.path.append(user_site)
+for py_ver in ["Python313", "Python312", "Python311", "Python310"]:
+    p = os.path.expanduser(f"~\\AppData\\Roaming\\Python\\{py_ver}\\site-packages")
+    if os.path.exists(p) and p not in sys.path:
+        sys.path.append(p)
 
 # ─────────────────────────────────────────────────────────────────────
 # P  — Production-Grade Modeling & QA Engine
@@ -858,6 +868,413 @@ class P:
         obj_col.hide_render = True
         return [obj_col.name]
 
+    # ─────────────────────────────────────────────────────────────────
+    # ENHANCEMENT PATTERNS (Part 2 of Specification)
+    # ─────────────────────────────────────────────────────────────────
+    @staticmethod
+    def add_subdivision_surface_modifier(obj_name_or_obj, levels=2, render_levels=3):
+        """Adds smooth subdivision surface modifier to make blocky geometry smooth."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        subdiv = obj.modifiers.new(name="Subdivision", type='SUBSURF')
+        subdiv.levels = levels
+        subdiv.render_levels = render_levels
+        subdiv.subdivision_type = 'CATMULL_CLARK'
+        return {
+            "status": "success",
+            "modifier": "Subdivision Surface",
+            "levels": levels,
+            "message": f"Mesh now smooth. Viewport level {levels}, render level {render_levels}"
+        }
+
+    @staticmethod
+    def add_bevel_modifier(obj_name_or_obj, width=0.05, segments=3, limit_method='ANGLE'):
+        """Adds bevel modifier to round off sharp edges realistically."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        bevel = obj.modifiers.new(name="Bevel", type='BEVEL')
+        bevel.width = width
+        bevel.segments = segments
+        bevel.limit_method = limit_method
+        return {
+            "status": "success",
+            "modifier": "Bevel",
+            "width": width,
+            "segments": segments
+        }
+
+    @staticmethod
+    def add_mirror_modifier(obj_name_or_obj, axis='X', use_clip=False):
+        """Creates mirror copy on opposite side. Perfect for symmetrical objects."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        mirror = obj.modifiers.new(name="Mirror", type='MIRROR')
+        mirror.use_axis[0] = (axis.upper() == 'X')
+        mirror.use_axis[1] = (axis.upper() == 'Y')
+        mirror.use_axis[2] = (axis.upper() == 'Z')
+        mirror.use_clip = use_clip
+        return {
+            "status": "success",
+            "modifier": "Mirror",
+            "axis": axis,
+            "message": "Mirror applied. Model one half, other side mirrors automatically"
+        }
+
+    @staticmethod
+    def add_array_modifier(obj_name_or_obj, count=3, axis='X', offset=1.2):
+        """Creates multiple copies in a line. Good for: windows, fence posts, columns."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        array = obj.modifiers.new(name="Array", type='ARRAY')
+        array.count = count
+        array.relative_offset_displace[0] = (offset if axis.upper() == 'X' else 0)
+        array.relative_offset_displace[1] = (offset if axis.upper() == 'Y' else 0)
+        array.relative_offset_displace[2] = (offset if axis.upper() == 'Z' else 0)
+        return {
+            "status": "success",
+            "modifier": "Array",
+            "count": count,
+            "axis": axis,
+            "message": f"Creating {count} copies along {axis} axis"
+        }
+
+    @staticmethod
+    def apply_all_modifiers(obj_name_or_obj):
+        """Converts all modifiers to actual geometry (permanent)."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+            for modifier in list(obj.modifiers):
+                try:
+                    bpy.ops.object.modifier_apply(modifier=modifier.name)
+                except Exception:
+                    pass
+        return {
+            "status": "success",
+            "message": f"Applied all modifiers to {obj.name}. Now permanent geometry."
+        }
+
+    @staticmethod
+    def create_custom_cube(name, size_x=2.0, size_y=2.0, size_z=2.0, subdivisions=1, position=(0,0,0)):
+        """Creates cube with EXACT dimensions and subdivision control."""
+        mesh = bpy.data.meshes.new(name=f"{name}_mesh")
+        vertices = [
+            (-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
+            (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)
+        ]
+        faces = [
+            (0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1),
+            (2, 6, 7, 3), (0, 3, 7, 4), (1, 5, 6, 2)
+        ]
+        mesh.from_pydata(vertices, [], faces)
+        mesh.update()
+        obj = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(obj)
+        obj.scale[0] = size_x / 2.0
+        obj.scale[1] = size_y / 2.0
+        obj.scale[2] = size_z / 2.0
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+            bpy.ops.object.transform_apply(scale=True)
+        for face in mesh.polygons:
+            face.use_smooth = True
+        if subdivisions > 0:
+            P.add_subdivision_surface_modifier(obj, levels=subdivisions)
+        obj.location = position
+        return {
+            "status": "success",
+            "object": name,
+            "dimensions": (size_x, size_y, size_z),
+            "position": position,
+            "message": f"Created cube '{name}': {size_x}x{size_y}x{size_z} at {position}"
+        }
+
+    @staticmethod
+    def create_custom_sphere(name, radius=1.0, subdivisions=4, position=(0,0,0)):
+        """Creates sphere with exact radius and smoothness control."""
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, location=position)
+        obj = bpy.context.active_object
+        obj.name = name
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+            bpy.ops.object.shade_smooth()
+        if subdivisions > 1:
+            P.add_subdivision_surface_modifier(obj, levels=min(subdivisions, 4))
+        return {
+            "status": "success",
+            "object": name,
+            "radius": radius,
+            "subdivisions": subdivisions,
+            "position": position,
+            "message": f"Created sphere '{name}': radius {radius}, subdivisions {subdivisions}"
+        }
+
+    @staticmethod
+    def create_custom_cylinder(name, radius=1.0, height=3.0, subdivisions=4, vertices=8, position=(0,0,0)):
+        """Creates cylinder with precise control."""
+        bpy.ops.mesh.primitive_cylinder_add(radius=radius, depth=height, vertices=vertices, location=position)
+        obj = bpy.context.active_object
+        obj.name = name
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+            bpy.ops.object.shade_smooth()
+        if subdivisions > 1:
+            P.add_subdivision_surface_modifier(obj, levels=min(subdivisions, 3))
+        return {
+            "status": "success",
+            "object": name,
+            "radius": radius,
+            "height": height,
+            "sides": vertices,
+            "message": f"Created cylinder: radius {radius}, height {height}"
+        }
+
+    @staticmethod
+    def inset_face(obj_name_or_obj, depth=0.1, thickness=0.05):
+        """Creates inset on face (like window/door depth)."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+            try:
+                bpy.ops.object.mode_set(mode='EDIT')
+                bpy.ops.mesh.select_all(action='SELECT')
+                bpy.ops.mesh.inset(thickness=thickness, depth=0, use_outset=False, use_boundary=True, use_even_offset=True)
+                bpy.ops.mesh.extrude_region(use_normal_flip=False, use_dissolve_faces=False)
+                bpy.ops.transform.resize(value=(1, 1, -depth))
+                bpy.ops.object.mode_set(mode='OBJECT')
+            except Exception:
+                bpy.ops.object.mode_set(mode='OBJECT')
+        return {
+            "status": "success",
+            "object": obj.name,
+            "depth": depth,
+            "thickness": thickness,
+            "message": f"Created inset (window/door): depth {depth}, frame {thickness}"
+        }
+
+    @staticmethod
+    def transform_object(obj_name_or_obj, scale=None, rotation=None, location=None):
+        """Transform object (scale, rotate, move) and apply scale/rotation."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        if scale:
+            obj.scale = scale
+        if rotation:
+            obj.rotation_euler[0] = math.radians(rotation[0]) if rotation[0] else 0
+            obj.rotation_euler[1] = math.radians(rotation[1]) if rotation[1] else 0
+            obj.rotation_euler[2] = math.radians(rotation[2]) if rotation[2] else 0
+        if location:
+            obj.location = location
+        obj.select_set(True)
+        bpy.context.view_layer.objects.active = obj
+        with bpy.context.temp_override(object=obj, active_object=obj, selected_objects=[obj]):
+            bpy.ops.object.transform_apply(scale=True, rotation=True, location=False)
+        return {
+            "status": "success",
+            "object": obj.name,
+            "scale": scale,
+            "rotation": rotation,
+            "location": location,
+            "message": "Object transformed and transforms applied"
+        }
+
+    @staticmethod
+    def create_roof(name, width=4.0, depth=3.0, height=1.5, angle=45.0, thickness=0.2, position=(0,0,0)):
+        """Creates pitched roof for houses."""
+        mesh = bpy.data.meshes.new(f"{name}_mesh")
+        vertices = [
+            (-width/2.0, -depth/2.0, 0),
+            (width/2.0, -depth/2.0, 0),
+            (width/2.0, depth/2.0, 0),
+            (-width/2.0, depth/2.0, 0),
+            (-width/2.0, depth/2.0, height),
+            (width/2.0, depth/2.0, height),
+        ]
+        faces = [
+            (2, 1, 0, 3),
+            (4, 5, 2, 3),
+            (0, 1, 5, 4),
+            (0, 4, 3),
+            (5, 1, 2)
+        ]
+        mesh.from_pydata(vertices, [], faces)
+        mesh.update()
+        obj = bpy.data.objects.new(name, mesh)
+        bpy.context.scene.collection.objects.link(obj)
+        obj.location = position
+        for face in mesh.polygons:
+            face.use_smooth = True
+        if thickness > 0:
+            P.add_bevel_modifier(name, width=thickness/10.0, segments=2)
+        return {
+            "status": "success",
+            "object": name,
+            "width": width,
+            "depth": depth,
+            "height": height,
+            "message": f"Created roof: {width}x{depth}, peak height {height}"
+        }
+
+    @staticmethod
+    def create_material(name, base_color=(1, 0, 0, 1), metallic=0.0, roughness=0.5, emission=(0, 0, 0, 1)):
+        """Creates Principled BSDF material (Blender's main shader)."""
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+        mat.node_tree.nodes.clear()
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        principled = nodes.new(type='ShaderNodeBsdfPrincipled')
+        principled.inputs['Base Color'].default_value = base_color
+        principled.inputs['Metallic'].default_value = metallic
+        principled.inputs['Roughness'].default_value = roughness
+        if 'Emission Color' in principled.inputs:
+            principled.inputs['Emission Color'].default_value = emission
+        elif 'Emission' in principled.inputs:
+            principled.inputs['Emission'].default_value = emission
+        output = nodes.new(type='ShaderNodeOutputMaterial')
+        output.location = (400, 0)
+        links.new(principled.outputs['BSDF'], output.inputs['Surface'])
+        return {
+            "status": "success",
+            "material": name,
+            "color": base_color[:3],
+            "metallic": metallic,
+            "roughness": roughness,
+            "message": f"Created material '{name}' with color RGB{base_color[:3]}"
+        }
+
+    @staticmethod
+    def assign_material_to_object(obj_name_or_obj, material_name):
+        """Applies material to object so it's visible."""
+        obj = bpy.data.objects.get(obj_name_or_obj) if isinstance(obj_name_or_obj, str) else obj_name_or_obj
+        if not obj: return {"status": "error", "message": f"Object '{obj_name_or_obj}' not found"}
+        mat = bpy.data.materials.get(material_name)
+        if not mat: return {"status": "error", "message": f"Material '{material_name}' not found"}
+        if len(obj.material_slots) == 0:
+            obj.data.materials.append(mat)
+        else:
+            obj.material_slots[0].material = mat
+        return {
+            "status": "success",
+            "object": obj.name,
+            "material": material_name,
+            "message": f"Assigned '{material_name}' to '{obj.name}'"
+        }
+
+    @staticmethod
+    def create_textured_material(name, texture_type='BRICK', base_color=(0.7, 0.5, 0.3, 1), roughness=0.8):
+        """Creates procedural texture (no image files needed)."""
+        mat = bpy.data.materials.new(name=name)
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        links = mat.node_tree.links
+        nodes.clear()
+        if texture_type == 'BRICK':
+            tex = nodes.new(type='ShaderNodeTexBrick')
+            tex.location = (-400, 0)
+        elif texture_type == 'NOISE':
+            tex = nodes.new(type='ShaderNodeTexNoise')
+            tex.location = (-400, 0)
+        elif texture_type == 'VORONOI':
+            tex = nodes.new(type='ShaderNodeTexVoronoi')
+            tex.location = (-400, 0)
+        else:
+            tex = nodes.new(type='ShaderNodeTexWave')
+            tex.location = (-400, 0)
+        # ColorRamp to add more control (converts texture to useful range)
+        try:
+            color_ramp = nodes.new(type='ShaderNodeValToRGB')
+        except Exception:
+            color_ramp = nodes.new(type='ShaderNodeValRamp')
+        color_ramp.location = (-200, 0)
+        principled = nodes.new(type='ShaderNodeBsdfPrincipled')
+        principled.location = (0, 0)
+        principled.inputs['Base Color'].default_value = base_color
+        principled.inputs['Roughness'].default_value = roughness
+        output = nodes.new(type='ShaderNodeOutputMaterial')
+        output.location = (400, 0)
+        links.new(tex.outputs[0], color_ramp.inputs['Fac'])
+        links.new(color_ramp.outputs['Color'], principled.inputs['Base Color'])
+        links.new(principled.outputs['BSDF'], output.inputs['Surface'])
+        return {
+            "status": "success",
+            "material": name,
+            "texture": texture_type,
+            "message": f"Created {texture_type} textured material"
+        }
+
+    @staticmethod
+    def build_simple_house(name="House", position=(0, 0, 0)):
+        """Master pattern compound workflow: Create house with walls, roof, door, windows, materials, modifiers."""
+        P.create_material("Brick_Red", base_color=(0.75, 0.35, 0.2, 1), roughness=0.8)
+        P.create_material("Wood_Brown", base_color=(0.4, 0.25, 0.1, 1), roughness=0.7)
+        P.create_material("Glass_Blue", base_color=(0.5, 0.8, 0.95, 1), metallic=0.0, roughness=0.1)
+        P.create_material("Black", base_color=(0.1, 0.1, 0.1, 1), roughness=0.5)
+
+        P.create_custom_cube(f"{name}_Walls", size_x=6, size_y=4, size_z=3.5, subdivisions=1, position=position)
+        P.transform_object(f"{name}_Walls", scale=(1, 1, 1))
+        P.add_subdivision_surface_modifier(f"{name}_Walls", levels=1)
+        P.add_bevel_modifier(f"{name}_Walls", width=0.05, segments=2)
+        P.assign_material_to_object(f"{name}_Walls", "Brick_Red")
+
+        roof_pos = (position[0], position[1], position[2] + 1.8)
+        P.create_roof(f"{name}_Roof", width=6.5, depth=4.5, height=1.5, position=roof_pos)
+        P.assign_material_to_object(f"{name}_Roof", "Wood_Brown")
+
+        P.create_custom_cube(f"{name}_Door_Frame", size_x=0.8, size_y=2.0, size_z=0.05, position=(position[0], position[1] - 2.2, position[2] + 0.5))
+        P.assign_material_to_object(f"{name}_Door_Frame", "Wood_Brown")
+
+        window_positions = [
+            (-1.5, position[1] - 2.2, position[2] + 1.2),
+            (0, position[1] - 2.2, position[2] + 1.2),
+            (1.5, position[1] - 2.2, position[2] + 1.2),
+        ]
+        for i, win_pos in enumerate(window_positions):
+            win_name = f"{name}_Window_{i}"
+            P.create_custom_cube(win_name, size_x=0.6, size_y=0.6, size_z=0.02, position=win_pos)
+            P.assign_material_to_object(win_name, "Glass_Blue")
+
+        P.apply_all_modifiers(f"{name}_Walls")
+        P.apply_all_modifiers(f"{name}_Roof")
+
+        return {
+            "status": "success",
+            "house_name": name,
+            "components": [
+                f"{name}_Walls",
+                f"{name}_Roof",
+                f"{name}_Door_Frame",
+                "3 Windows"
+            ],
+            "materials": ["Brick_Red", "Wood_Brown", "Glass_Blue"],
+            "modifiers": "Subdivision Surface, Bevel",
+            "message": f"✓ House '{name}' created! Walls: brick, Roof: wood, Windows: glass, Door: wood"
+        }
+
+
+# Standalone function aliases for direct top-level access
+add_subdivision_surface_modifier = P.add_subdivision_surface_modifier
+add_bevel_modifier = P.add_bevel_modifier
+add_mirror_modifier = P.add_mirror_modifier
+add_array_modifier = P.add_array_modifier
+apply_all_modifiers = P.apply_all_modifiers
+create_custom_cube = P.create_custom_cube
+create_custom_sphere = P.create_custom_sphere
+create_custom_cylinder = P.create_custom_cylinder
+inset_face = P.inset_face
+transform_object = P.transform_object
+create_roof = P.create_roof
+create_material = P.create_material
+assign_material_to_object = P.assign_material_to_object
+create_textured_material = P.create_textured_material
+build_simple_house = P.build_simple_house
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -1568,41 +1985,74 @@ _server_instance = None
 _PORT = 9882
 
 
+import queue
+_task_queue = queue.Queue()
+
+def _pump_tasks():
+    """Continuously pump tasks on Blender's main thread every 20ms."""
+    while not _task_queue.empty():
+        try:
+            fn, done_event, res_container, err_container = _task_queue.get_nowait()
+            try:
+                res_container[0] = fn()
+            except Exception as e:
+                err_container[0] = str(e) + "\n" + traceback.format_exc()
+            finally:
+                done_event.set()
+        except queue.Empty:
+            break
+    return 0.02
+
+def _run_in_main_thread(fn, timeout=120.0):
+    """Safely queue and execute function on Blender main thread."""
+    done_event = threading.Event()
+    res_container = [None]
+    err_container = [None]
+    _task_queue.put((fn, done_event, res_container, err_container))
+    done_event.wait(timeout=timeout)
+    if err_container[0]:
+        return {"error": err_container[0]}
+    return res_container[0]
+
 def _run_script_handler(script_code):
-    """Execute Python code in Blender's main thread via bpy.app.timers."""
+    """Execute Python code in Blender's main thread with full enhancement namespace."""
     import bmesh
     import mathutils
-    result_container = [None]
-    error_container = [None]
-    done_event = threading.Event()
-
     def _execute():
-        try:
-            namespace = {
-                'bpy': bpy,
-                'bmesh': bmesh,
-                'mathutils': mathutils,
-                'math': math,
-                'random': random,
-                'os': os,
-                'P': P,
-                'PH': PH,
-                'result': None,
-            }
-            exec(script_code, namespace)
-            result_container[0] = namespace.get('result')
-        except Exception as ex:
-            error_container[0] = str(ex) + "\n" + traceback.format_exc()
-        finally:
-            done_event.set()
-        return None
+        namespace = {
+            'bpy': bpy,
+            'bmesh': bmesh,
+            'mathutils': mathutils,
+            'math': math,
+            'random': random,
+            'os': os,
+            'P': P,
+            'PH': PH,
+            'result': None,
+            # 15 Enhancement Functions
+            'add_subdivision_surface_modifier': add_subdivision_surface_modifier,
+            'add_bevel_modifier': add_bevel_modifier,
+            'add_mirror_modifier': add_mirror_modifier,
+            'add_array_modifier': add_array_modifier,
+            'apply_all_modifiers': apply_all_modifiers,
+            'create_custom_cube': create_custom_cube,
+            'create_custom_sphere': create_custom_sphere,
+            'create_custom_cylinder': create_custom_cylinder,
+            'inset_face': inset_face,
+            'transform_object': transform_object,
+            'create_roof': create_roof,
+            'create_material': create_material,
+            'assign_material_to_object': assign_material_to_object,
+            'create_textured_material': create_textured_material,
+            'build_simple_house': build_simple_house,
+        }
+        exec(script_code, namespace)
+        return namespace.get('result')
 
-    bpy.app.timers.register(_execute, first_interval=0.0)
-    done_event.wait(timeout=120.0)
-
-    if error_container[0]:
-        return {"error": error_container[0]}
-    return {"out": result_container[0]}
+    res = _run_in_main_thread(_execute, timeout=120.0)
+    if isinstance(res, dict) and "error" in res:
+        return res
+    return {"out": res}
 
 
 async def _ws_handler(websocket):
@@ -1899,11 +2349,10 @@ def register():
             bpy.utils.register_class(cls)
         except Exception:
             pass
-    def _auto():
-        _start_server_thread()
-        return None
-    bpy.app.timers.register(_auto, first_interval=1.0)
-    print("[MCP Connector v2] Registered — P + PH engines active")
+    if not bpy.app.timers.is_registered(_pump_tasks):
+        bpy.app.timers.register(_pump_tasks, first_interval=0.02, persistent=True)
+    _start_server_thread()
+    print("[MCP Connector v2] Registered & Server Started — P + PH engines active")
 
 
 def unregister():
